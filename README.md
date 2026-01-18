@@ -241,10 +241,10 @@ git checkout my-feature-branch
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
-│   "The best time to understand your code was when you wrote it.    │
+│   "The best time to understand your code was when you wrote it.     │
 │    The second best time is now."                                    │
 │                                                                     │
-│                                          — Ancient Developer Proverb │
+│                                         — Ancient Developer Proverb │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -262,6 +262,7 @@ DoI helps you:
 ## Contributing
 
 We'd love your help making DoI even better! Whether it's:
+- New core features suggestions to reduce Vibe debt
 - New question types
 - Better quiz algorithms
 - UI improvements
