@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# /doi skill installer for Claude Code
+# RuleYourUsage skills installer for Claude Code
 # Usage: ./install.sh [--global | target-directory]
-# --global: Install to ~/.claude/skills/doi (available in all projects)
-# target-directory: Install to that project's .claude/skills/doi
+# --global: Install to ~/.claude/skills/ (available in all projects)
+# target-directory: Install to that project's .claude/skills/
 # No args: Install globally
 
 set -e
@@ -14,36 +14,52 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILLS_SOURCE="$SCRIPT_DIR/.claude/skills"
 
 # Default to global install
 if [ "$1" = "--global" ] || [ -z "$1" ]; then
-    TARGET_SKILL_DIR="$HOME/.claude/skills/doi"
+    TARGET_BASE="$HOME/.claude/skills"
 else
-    TARGET_SKILL_DIR="$1/.claude/skills/doi"
+    TARGET_BASE="$1/.claude/skills"
 fi
 
-echo -e "${YELLOW}Installing /doi skill for Claude Code...${NC}"
+echo -e "${YELLOW}Installing RuleYourUsage skills for Claude Code...${NC}"
 
-# Check source files exist
-if [ ! -f "$SCRIPT_DIR/.claude/skills/doi/SKILL.md" ]; then
-    echo -e "${RED}Error: SKILL.md not found${NC}"
+# Check skills directory exists
+if [ ! -d "$SKILLS_SOURCE" ]; then
+    echo -e "${RED}Error: No skills found in $SKILLS_SOURCE${NC}"
     exit 1
 fi
 
-if [ ! -d "$SCRIPT_DIR/src/doi" ]; then
-    echo -e "${RED}Error: src/doi not found${NC}"
-    exit 1
-fi
+# Install each skill
+INSTALLED=0
+for SKILL_DIR in "$SKILLS_SOURCE"/*/; do
+    SKILL_NAME=$(basename "$SKILL_DIR")
 
-# Create target directory
-mkdir -p "$TARGET_SKILL_DIR/src"
+    # Skip if no SKILL.md
+    if [ ! -f "$SKILL_DIR/SKILL.md" ]; then
+        echo -e "${YELLOW}Skipping $SKILL_NAME (no SKILL.md)${NC}"
+        continue
+    fi
 
-# Copy SKILL.md
-cp "$SCRIPT_DIR/.claude/skills/doi/SKILL.md" "$TARGET_SKILL_DIR/SKILL.md"
+    TARGET_SKILL_DIR="$TARGET_BASE/$SKILL_NAME"
 
-# Copy src/doi contents
-cp -r "$SCRIPT_DIR/src/doi/"* "$TARGET_SKILL_DIR/src/"
+    # Create target directory
+    mkdir -p "$TARGET_SKILL_DIR"
 
-echo -e "${GREEN}Installed /doi skill to $TARGET_SKILL_DIR${NC}"
+    # Copy all .md files (SKILL.md and any subcommand files)
+    cp "$SKILL_DIR"/*.md "$TARGET_SKILL_DIR/"
+
+    # Copy src if exists
+    if [ -d "$SCRIPT_DIR/src/$SKILL_NAME" ]; then
+        mkdir -p "$TARGET_SKILL_DIR/src"
+        cp -r "$SCRIPT_DIR/src/$SKILL_NAME/"* "$TARGET_SKILL_DIR/src/"
+    fi
+
+    echo -e "${GREEN}Installed /$SKILL_NAME${NC}"
+    INSTALLED=$((INSTALLED + 1))
+done
+
 echo ""
-echo "You can now use /doi in Claude Code!"
+echo -e "${GREEN}Installed $INSTALLED skill(s) to $TARGET_BASE${NC}"
+echo "You can now use these skills in Claude Code!"
