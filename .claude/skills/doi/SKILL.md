@@ -130,47 +130,131 @@ Based on the git diff output, create a structured summary:
 
 Present this summary to the user before starting the quiz.
 
-### Step 3: Generate Questions
-Generate MCQ questions based on the diff analysis. Guidelines:
+### Step 3: Generate ALL Questions with Pre-Rendered Responses
 
-- **Question Count**: Scale with complexity
-  - Small diff (1-50 lines): 2-3 questions
-  - Medium diff (50-200 lines): 4-6 questions
-  - Large diff (200-500 lines): 6-8 questions
-  - Very large diff (500+ lines): 8-10 questions
+**CRITICAL FOR SPEED:** Generate a complete question bank WITH pre-rendered feedback strings BEFORE starting the quiz.
 
-- **Question Types** (mix these):
-  - "Why" questions: Purpose behind a change
-  - "How" questions: Mechanism of implementation
-  - "What if" questions: Edge cases and error handling
-  - "Impact" questions: Effects on other parts of the codebase
+For each question, prepare AND STORE as a structured block:
+```
+=== QUESTION 1 ===
+QUESTION_TEXT: <the question>
+OPTION_A: <option A>
+OPTION_B: <option B>
+OPTION_C: <option C>
+OPTION_D: <option D>
+CORRECT: <A|B|C|D>
+FEEDBACK_CORRECT: ✅ **Correct!** <full explanation with code snippet if applicable>
+FEEDBACK_WRONG: ❌ **Incorrect.** The correct answer is **<X>**: "<answer text>"
 
-- **Answer Format**:
-  - Exactly 4 options (A, B, C, D)
-  - One correct answer
-  - Three plausible distractors that test common misconceptions
-  - Options should be similar in length and style
+<full explanation with code snippet if applicable>
+FEEDBACK_REVEALED: 💡 **Answer: <X>** - "<answer text>"
+
+<full explanation with code snippet if applicable>
+=== END QUESTION 1 ===
+```
+
+**Output this entire question bank** before proceeding to Step 4. This ensures:
+- Zero generation time when showing feedback (just echo the pre-rendered string)
+- Zero generation time for next question (just echo from the bank)
+
+The only processing needed per answer is matching user input to CORRECT and selecting the right FEEDBACK_* string.
+
+**Question Count** (scales with complexity):
+- Small diff (1-50 lines): 2-3 questions
+- Medium diff (50-200 lines): 4-6 questions
+- Large diff (200-500 lines): 6-8 questions
+- Very large diff (500+ lines): 8-10 questions
+
+**Question Types** (mix these):
+- "Why" questions (25%): Purpose behind a change
+- "How" questions (35%): Mechanism of implementation
+- "What if" questions (20%): Edge cases and error handling
+- "Impact" questions (20%): Effects on other parts of the codebase
+
+**Answer Format**:
+- Exactly 4 options (A, B, C, D)
+- One correct answer
+- Three plausible distractors that test common misconceptions
+- Options should be similar in length and style
+
+**Code Snippet Format** (when applicable):
+```json
+{
+  "codeSnippet": {
+    "code": "function example() { ... }",
+    "language": "typescript",
+    "description": "This shows how the validation works"
+  }
+}
+```
 
 ### Step 4: Interactive Quiz
-Use the AskUserQuestion tool to present questions one at a time.
 
-For each question:
-- Display the question text
-- Show all 4 options
-- Include a "Skip all remaining questions" option
+Present questions one at a time using AskUserQuestion tool. Since all questions are pre-generated, there should be no delay between questions.
 
-After each answer:
-- If correct: Acknowledge and explain briefly why it's correct
-- If incorrect: Explain the correct answer without being condescending
-- If skipped: Move to Step 5 immediately
+**Question Format:**
+- Display question text with number (e.g., "Question 3/7:")
+- Show 4 answer options: **A**, **B**, **C**, **D**
+- Include hint for "show me" and "skip" via Other option
 
-Track:
+**IMPORTANT:** AskUserQuestion only supports 2-4 options. We use all 4 for answer choices. "Show Me" and "Skip" are accessed via the system-provided "Other" option where users type the command.
+
+```json
+{
+  "questions": [{
+    "question": "Question N/M: <question text>\n\n_💡 Type \"show me\" or \"skip\" in Other for special actions_",
+    "header": "QN",
+    "multiSelect": false,
+    "options": [
+      { "label": "A", "description": "<option A text>" },
+      { "label": "B", "description": "<option B text>" },
+      { "label": "C", "description": "<option C text>" },
+      { "label": "D", "description": "<option D text>" }
+    ]
+  }]
+}
+```
+
+**After user responds - USE PRE-RENDERED FEEDBACK (do not regenerate):**
+
+**If A/B/C/D (correct answer):**
+- **Echo FEEDBACK_CORRECT exactly as pre-rendered** (do not regenerate)
+- Immediately show next question from bank
+
+**If A/B/C/D (wrong answer):**
+- **Echo FEEDBACK_WRONG exactly as pre-rendered** (do not regenerate)
+- Then ask using AskUserQuestion: "Would you like to continue or learn more about this?"
+  - **Continue**: Move to next question
+  - **Ask More**: Let user ask follow-up questions about this topic, then continue when ready
+
+**If Other contains "show" (case-insensitive):**
+- **Echo FEEDBACK_REVEALED exactly as pre-rendered** (do not regenerate)
+- This counts as vibe debt (tracked as "revealed" status)
+- Proceed to next question
+
+**If Other contains "skip" (case-insensitive):**
+- Display: `⏭️ Skipped N remaining questions. These will be saved as Vibe Debt.`
+- Mark all remaining questions as skipped
+- Proceed immediately to Step 5
+
+**If Other (anything else):**
+- Treat as a clarification request about the current question
+- Answer the user's question, then re-present the same quiz question
+
+**Track:**
 - Questions answered correctly
 - Questions answered incorrectly
+- Questions revealed (via "Show Me")
 - Questions skipped
 
 ### Step 5: Store Vibe Debt (if applicable)
-If any questions were skipped OR answered incorrectly:
+
+Save questions that were:
+- Answered incorrectly
+- Revealed via "Show Me"
+- Skipped
+
+If any of the above occurred:
 
 1. Create the `VibeDebt/` directory in the project root if it doesn't exist
 2. Generate filename: `<branch-name>_<YYYY-MM-DD>.json`
@@ -198,7 +282,7 @@ If any questions were skipped OR answered incorrectly:
       },
       "correctAnswer": "B",
       "explanation": "...",
-      "status": "skipped|incorrect",
+      "status": "skipped|incorrect|revealed",
       "userAnswer": null|"A",
       "relatedFiles": ["src/file.ts"],
       "category": "why|how|what-if|impact"
@@ -209,9 +293,15 @@ If any questions were skipped OR answered incorrectly:
     "correct": 2,
     "incorrect": 1,
     "skipped": 2
-  }
+  },
+  "schemaVersion": 1
 }
 ```
+
+**Status field values:**
+- `"incorrect"` - User answered wrong
+- `"revealed"` - User chose "Show Me"
+- `"skipped"` - User chose "Skip All" or question was skipped
 
 ### Step 6: Present Results
 Display a summary:
