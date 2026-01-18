@@ -1,12 +1,8 @@
-<<<<<<< Updated upstream
-# DoI
-=======
 <p align="center">
   <img src="https://img.shields.io/badge/Vibe%20Coding-Understood-brightgreen?style=for-the-badge&logo=sparkles" alt="Vibe Coding Understood"/>
   <img src="https://img.shields.io/badge/Technical%20Debt-Managed-blue?style=for-the-badge&logo=checkmarx" alt="Technical Debt Managed"/>
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-purple?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin"/>
 </p>
->>>>>>> Stashed changes
 
 <h1 align="center">Do I Understand It?</h1>
 
