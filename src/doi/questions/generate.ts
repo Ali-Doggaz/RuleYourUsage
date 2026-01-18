@@ -227,13 +227,45 @@ export function distributeQuestionCategories(
 // =============================================================================
 
 /**
+ * Guidelines for including code snippets with question explanations.
+ */
+export const CODE_SNIPPET_GUIDELINES = `
+## Code Snippet Guidelines
+
+When generating questions, also prepare a relevant code snippet for the explanation:
+
+### When to Include Snippets
+- For "how" questions: Show the implementation
+- For "why" questions: Show the code that demonstrates the reason
+- For "what-if" questions: Show the edge case handling
+- For "impact" questions: Show the affected code
+
+### Snippet Format
+- Keep snippets concise (5-15 lines ideally)
+- Include just enough context to understand
+- Use the correct language for syntax highlighting
+
+### When NOT to Include
+- Simple config changes
+- Questions about overall architecture
+- When the answer is conceptual, not code-based
+`;
+
+/**
  * Guidelines for Claude when generating questions during skill execution.
  * These are embedded in the skill definition as instructions.
  */
 export const QUESTION_GENERATION_GUIDELINES = `
 ## Question Generation Guidelines
 
-When generating MCQ questions for the diff, follow these principles:
+**IMPORTANT: Generate ALL questions upfront before starting the quiz.**
+
+For each question, prepare:
+1. The question text
+2. Four answer options (A, B, C, D)
+3. The correct answer
+4. A detailed explanation
+5. A code snippet (when applicable) showing relevant code from the diff
 
 ### Question Quality
 1. Each question must be answerable ONLY from the diff content
@@ -259,6 +291,24 @@ Aim for this distribution:
 - WHAT-IF (20%): Edge cases and error handling
 - IMPACT (20%): Effects on other code
 
+### Code Snippet Guidelines
+For each question, prepare a code snippet when applicable:
+- For "how" questions: Show the implementation
+- For "why" questions: Show the code that demonstrates the reason
+- For "what-if" questions: Show the edge case handling
+- For "impact" questions: Show the affected code
+
+Format:
+\`\`\`
+{
+  "codeSnippet": {
+    "code": "function example() { ... }",
+    "language": "typescript",
+    "description": "This shows how the validation works"
+  }
+}
+\`\`\`
+
 ### Example Good Question
 Based on a change adding input validation:
 
@@ -274,6 +324,17 @@ D) JavaScript's regex engine doesn't support plus sign matching
 - A: Plus signs ARE valid per RFC 5321
 - B: No evidence of database limitations in the diff
 - D: JS regex definitely supports plus signs
+
+**Code Snippet** (to show with explanation):
+\`\`\`typescript
+function validateEmail(email: string): boolean {
+  // Reject plus signs to prevent rate limit bypass via subaddressing
+  if (email.includes('+')) {
+    return false;
+  }
+  return EMAIL_REGEX.test(email);
+}
+\`\`\`
 
 ### Example Bad Question
 **Question**: What function was added?

@@ -61,6 +61,7 @@ export function formatQuestionForPresentation(
       { label: 'B', description: question.options.B },
       { label: 'C', description: question.options.C },
       { label: 'D', description: question.options.D },
+      { label: 'Show Me', description: "I don't know - show me the answer" },
       { label: 'Skip All', description: 'Skip remaining questions (saves as Vibe Debt)' },
     ],
   };
@@ -83,13 +84,16 @@ Use AskUserQuestion with this structure for each quiz question:
       { "label": "B", "description": "<option B text>" },
       { "label": "C", "description": "<option C text>" },
       { "label": "D", "description": "<option D text>" },
+      { "label": "Show Me", "description": "I don't know - show me the answer" },
       { "label": "Skip All", "description": "Skip remaining questions (saves as Vibe Debt)" }
     ]
   }]
 }
 
 After the user selects an answer:
-- If A/B/C/D: Compare to correct answer and show feedback
+- If A/B/C/D (correct): Show ✅ feedback and proceed to next question
+- If A/B/C/D (incorrect): Show ❌ feedback, then ask if user wants to continue or ask more
+- If Show Me: Show 💡 answer with explanation (counts as vibe debt)
 - If Skip All: Immediately proceed to save remaining questions as Vibe Debt
 - If Other: Treat as a request for clarification
 `;
@@ -112,10 +116,10 @@ export function generateFeedback(
   isCorrect: boolean
 ): string {
   if (isCorrect) {
-    return `Correct! ${question.explanation}`;
+    return `✅ **Correct!** ${question.explanation}`;
   }
 
-  return `Not quite. The correct answer is ${question.correctAnswer}: "${question.options[question.correctAnswer]}". ${question.explanation}`;
+  return `❌ **Incorrect.** The correct answer is **${question.correctAnswer}**: "${question.options[question.correctAnswer]}"\n\n${question.explanation}`;
 }
 
 /**
@@ -123,14 +127,80 @@ export function generateFeedback(
  */
 export const FEEDBACK_TEMPLATES = {
   correct: (explanation: string) =>
-    `Correct! ${explanation}`,
+    `✅ **Correct!** ${explanation}`,
 
   incorrect: (correctAnswer: string, correctText: string, explanation: string) =>
-    `Not quite. The correct answer is ${correctAnswer}: "${correctText}". ${explanation}`,
+    `❌ **Incorrect.** The correct answer is **${correctAnswer}**: "${correctText}"\n\n${explanation}`,
+
+  revealed: (correctAnswer: string, correctText: string, explanation: string) =>
+    `💡 **Answer: ${correctAnswer}** - "${correctText}"\n\n${explanation}`,
 
   skipped: (remainingCount: number) =>
-    `Skipped ${remainingCount} remaining question${remainingCount !== 1 ? 's' : ''}. These will be saved as Vibe Debt for later review.`,
+    `⏭️ Skipped ${remainingCount} remaining question${remainingCount !== 1 ? 's' : ''}. These will be saved as Vibe Debt for later review.`,
 };
+
+/**
+ * Generates enhanced feedback with optional code snippet.
+ *
+ * @param question - The answered question
+ * @param userAnswer - What the user selected ('A' | 'B' | 'C' | 'D' | 'Show Me')
+ * @param isCorrect - Whether they got it right (false for 'Show Me')
+ * @returns Enhanced feedback message with code snippet if available
+ */
+export function generateEnhancedFeedback(
+  question: MCQuestion,
+  userAnswer: 'A' | 'B' | 'C' | 'D' | 'Show Me',
+  isCorrect: boolean
+): string {
+  const correctText = question.options[question.correctAnswer];
+  let feedback: string;
+
+  if (isCorrect) {
+    feedback = FEEDBACK_TEMPLATES.correct(question.explanation);
+  } else if (userAnswer === 'Show Me') {
+    feedback = FEEDBACK_TEMPLATES.revealed(
+      question.correctAnswer,
+      correctText,
+      question.explanation
+    );
+  } else {
+    feedback = FEEDBACK_TEMPLATES.incorrect(
+      question.correctAnswer,
+      correctText,
+      question.explanation
+    );
+  }
+
+  // Add code snippet if available
+  if (question.codeSnippet) {
+    feedback += `\n\n**Relevant code:**\n\`\`\`${question.codeSnippet.language}\n${question.codeSnippet.code}\n\`\`\`\n${question.codeSnippet.description}`;
+  }
+
+  return feedback;
+}
+
+/**
+ * Prompt structure for asking user to continue or ask more after incorrect answer.
+ */
+export interface PostAnswerPrompt {
+  question: string;
+  header: string;
+  options: Array<{ label: string; description: string }>;
+}
+
+/**
+ * Creates a prompt for after an incorrect answer, letting user choose to continue or ask more.
+ */
+export function createPostIncorrectPrompt(): PostAnswerPrompt {
+  return {
+    question: 'Would you like to continue or learn more about this?',
+    header: 'Next',
+    options: [
+      { label: 'Continue', description: 'Move to the next question' },
+      { label: 'Ask More', description: 'I want to understand this better' },
+    ],
+  };
+}
 
 // =============================================================================
 // Progress Display
@@ -278,6 +348,7 @@ export function updateStats(
       updated.correct += 1;
       break;
     case 'incorrect':
+    case 'revealed': // Count revealed as vibe debt (same as incorrect)
       updated.incorrect += 1;
       break;
     case 'skipped':

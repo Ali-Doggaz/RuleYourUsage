@@ -101,47 +101,114 @@ Based on the git diff output, create a structured summary:
 
 Present this summary to the user before starting the quiz.
 
-### Step 3: Generate Questions
-Generate MCQ questions based on the diff analysis. Guidelines:
+### Step 3: Generate ALL Questions Upfront
 
-- **Question Count**: Scale with complexity
-  - Small diff (1-50 lines): 2-3 questions
-  - Medium diff (50-200 lines): 4-6 questions
-  - Large diff (200-500 lines): 6-8 questions
-  - Very large diff (500+ lines): 8-10 questions
+**IMPORTANT:** Generate all questions BEFORE starting the quiz to eliminate delays between questions.
 
-- **Question Types** (mix these):
-  - "Why" questions: Purpose behind a change
-  - "How" questions: Mechanism of implementation
-  - "What if" questions: Edge cases and error handling
-  - "Impact" questions: Effects on other parts of the codebase
+For each question, prepare:
+1. Question text
+2. Four options (A, B, C, D)
+3. Correct answer
+4. Detailed explanation (to show after answering)
+5. Code snippet from the diff (when relevant) - include code, language, and description
 
-- **Answer Format**:
-  - Exactly 4 options (A, B, C, D)
-  - One correct answer
-  - Three plausible distractors that test common misconceptions
-  - Options should be similar in length and style
+Store all questions in memory before proceeding to Step 4.
+
+**Question Count** (scales with complexity):
+- Small diff (1-50 lines): 2-3 questions
+- Medium diff (50-200 lines): 4-6 questions
+- Large diff (200-500 lines): 6-8 questions
+- Very large diff (500+ lines): 8-10 questions
+
+**Question Types** (mix these):
+- "Why" questions (25%): Purpose behind a change
+- "How" questions (35%): Mechanism of implementation
+- "What if" questions (20%): Edge cases and error handling
+- "Impact" questions (20%): Effects on other parts of the codebase
+
+**Answer Format**:
+- Exactly 4 options (A, B, C, D)
+- One correct answer
+- Three plausible distractors that test common misconceptions
+- Options should be similar in length and style
+
+**Code Snippet Format** (when applicable):
+```json
+{
+  "codeSnippet": {
+    "code": "function example() { ... }",
+    "language": "typescript",
+    "description": "This shows how the validation works"
+  }
+}
+```
 
 ### Step 4: Interactive Quiz
-Use the AskUserQuestion tool to present questions one at a time.
 
-For each question:
-- Display the question text
-- Show all 4 options
-- Include a "Skip all remaining questions" option
+Present questions one at a time using AskUserQuestion tool. Since all questions are pre-generated, there should be no delay between questions.
 
-After each answer:
-- If correct: Acknowledge and explain briefly why it's correct
-- If incorrect: Explain the correct answer without being condescending
-- If skipped: Move to Step 5 immediately
+**Question Format:**
+- Display question text with number (e.g., "Question 3/7:")
+- Show options: **A**, **B**, **C**, **D**, **Show Me**, **Skip All**
 
-Track:
+```json
+{
+  "questions": [{
+    "question": "Question N/M: <question text>",
+    "header": "QN",
+    "multiSelect": false,
+    "options": [
+      { "label": "A", "description": "<option A text>" },
+      { "label": "B", "description": "<option B text>" },
+      { "label": "C", "description": "<option C text>" },
+      { "label": "D", "description": "<option D text>" },
+      { "label": "Show Me", "description": "I don't know - show me the answer" },
+      { "label": "Skip All", "description": "Skip remaining questions (saves as Vibe Debt)" }
+    ]
+  }]
+}
+```
+
+**After user responds:**
+
+**If A/B/C/D (correct answer):**
+- Display: `✅ **Correct!** [explanation]`
+- If code snippet available, show it
+- Immediately proceed to next question
+
+**If A/B/C/D (wrong answer):**
+- Display: `❌ **Incorrect.** The correct answer is **[X]**: "[answer text]"`
+- Show explanation
+- If code snippet available, show it with context
+- Then ask using AskUserQuestion: "Would you like to continue or learn more about this?"
+  - **Continue**: Move to next question
+  - **Ask More**: Let user ask follow-up questions about this topic, then continue when ready
+
+**If Show Me:**
+- Display: `💡 **Answer: [X]** - "[answer text]"`
+- Show full explanation with code snippet
+- This counts as vibe debt (tracked as "revealed" status)
+- Proceed to next question
+
+**If Skip All:**
+- Display: `⏭️ Skipped N remaining questions. These will be saved as Vibe Debt.`
+- Mark all remaining questions as skipped
+- Proceed immediately to Step 5
+
+**Track:**
 - Questions answered correctly
 - Questions answered incorrectly
+- Questions revealed (via "Show Me")
 - Questions skipped
 
 ### Step 5: Store Vibe Debt (if applicable)
-If any questions were skipped OR answered incorrectly:
+
+Save questions that were:
+- Answered incorrectly
+- Revealed via "Show Me"
+- Skipped
+
+If any of the above occurred:
 
 1. Create the `VibeDebt/` directory in the project root if it doesn't exist
 2. Generate filename: `<branch-name>_<YYYY-MM-DD>.json`
@@ -169,7 +236,7 @@ If any questions were skipped OR answered incorrectly:
       },
       "correctAnswer": "B",
       "explanation": "...",
-      "status": "skipped|incorrect",
+      "status": "skipped|incorrect|revealed",
       "userAnswer": null|"A",
       "relatedFiles": ["src/file.ts"],
       "category": "why|how|what-if|impact"
@@ -180,9 +247,15 @@ If any questions were skipped OR answered incorrectly:
     "correct": 2,
     "incorrect": 1,
     "skipped": 2
-  }
+  },
+  "schemaVersion": 1
 }
 ```
+
+**Status field values:**
+- `"incorrect"` - User answered wrong
+- `"revealed"` - User chose "Show Me"
+- `"skipped"` - User chose "Skip All" or question was skipped
 
 ### Step 6: Present Results
 Display a summary:

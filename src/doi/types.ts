@@ -166,6 +166,20 @@ export type QuestionCategory =
   | 'impact';   // Effects on other parts of codebase
 
 /**
+ * A code snippet to show when explaining an answer.
+ */
+export interface CodeSnippet {
+  /** The code to display */
+  code: string;
+
+  /** Programming language for syntax highlighting */
+  language: string;
+
+  /** Brief description of what this code shows */
+  description: string;
+}
+
+/**
  * A single multiple-choice question.
  */
 export interface MCQuestion {
@@ -197,6 +211,9 @@ export interface MCQuestion {
 
   /** Difficulty level (for future use) */
   difficulty: 'easy' | 'medium' | 'hard';
+
+  /** Code snippet to show when explaining (optional) */
+  codeSnippet?: CodeSnippet;
 }
 
 /**
@@ -220,7 +237,7 @@ export interface QuestionSet {
 /**
  * Status of a question after user interaction.
  */
-export type QuestionStatus = 'pending' | 'correct' | 'incorrect' | 'skipped';
+export type QuestionStatus = 'pending' | 'correct' | 'incorrect' | 'skipped' | 'revealed';
 
 /**
  * Result of answering a single question.
@@ -301,8 +318,8 @@ export interface VibeDebtQuestion {
   /** Explanation */
   explanation: string;
 
-  /** Why this is debt: skipped or answered wrong */
-  status: 'skipped' | 'incorrect';
+  /** Why this is debt: skipped, answered wrong, or revealed */
+  status: 'skipped' | 'incorrect' | 'revealed';
 
   /** What the user answered (null if skipped) */
   userAnswer: 'A' | 'B' | 'C' | 'D' | null;
