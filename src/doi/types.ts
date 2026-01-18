@@ -18,8 +18,8 @@ export interface GitContext {
   /** Current branch name (e.g., "feature/add-auth") */
   currentBranch: string;
 
-  /** Main integration branch (e.g., "main" or "master") */
-  mainBranch: string;
+  /** Default branch detected from remote (e.g., "main", "master", "develop") */
+  defaultBranch: string;
 
   /** SHA of the merge base (common ancestor) */
   mergeBase: string;

@@ -3,7 +3,7 @@
  *
  * This module handles all interactions with git to extract diff information.
  * It provides functions to:
- * - Detect current branch and main branch
+ * - Detect current branch and default branch (from remote)
  * - Compute merge base between branches
  * - Extract full diff with context
  * - Parse file changes and statistics
@@ -33,14 +33,29 @@ export const GIT_COMMANDS = {
   /** Get current branch name */
   currentBranch: 'git rev-parse --abbrev-ref HEAD',
 
-  /** Check if 'main' branch exists */
-  hasMain: 'git show-ref --verify --quiet refs/heads/main',
-
-  /** Check if 'master' branch exists */
-  hasMaster: 'git show-ref --verify --quiet refs/heads/master',
+  /**
+   * Get the base branch (the branch the current branch was built on top of).
+   *
+   * Detection priority:
+   * 1. Remote's default branch (origin/HEAD) - works for most cloned repos
+   * 2. Upstream tracking branch - if current branch was created with -u or push -u
+   * 3. Closest ancestor branch - finds the branch with the nearest merge-base
+   *
+   * This approach correctly handles branches created from any base (main, staging, develop, etc.)
+   */
+  defaultBranch: (currentBranch: string) =>
+    // Try 1: Remote's configured default branch
+    `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || ` +
+    // Try 2: Upstream tracking branch for current branch
+    `git config --get branch.${currentBranch}.merge 2>/dev/null | sed 's@^refs/heads/@@' || ` +
+    // Try 3: Find closest ancestor branch by comparing merge-base distances (excluding current branch)
+    `(for b in $(git branch -r | grep -v HEAD | grep -v "origin/${currentBranch}" | sed 's/^ *//'); do ` +
+    `git merge-base HEAD "$b" >/dev/null 2>&1 && ` +
+    `echo "$(git rev-list --count $(git merge-base HEAD "$b")..HEAD) \${b#origin/}"; ` +
+    `done | sort -n | head -1 | awk '{print $2}')`,
 
   /** Get merge base between two refs */
-  mergeBase: (main: string) => `git merge-base ${main} HEAD`,
+  mergeBase: (defaultBranch: string) => `git merge-base ${defaultBranch} HEAD`,
 
   /** Get full diff from merge base to HEAD */
   diff: (mergeBase: string) => `git diff ${mergeBase}..HEAD`,
@@ -308,17 +323,17 @@ export function validateContext(
     return { isValid: false, error: 'Could not determine current branch' };
   }
 
-  if (context.currentBranch === context.mainBranch) {
+  if (context.currentBranch === context.defaultBranch) {
     return {
       isValid: false,
-      error: `Already on ${context.mainBranch} branch. Switch to a feature branch to analyze changes.`
+      error: `Already on ${context.defaultBranch} branch. Switch to a feature branch to analyze changes.`
     };
   }
 
   if (!context.hasChanges) {
     return {
       isValid: false,
-      error: 'No changes found between current branch and main. Nothing to analyze.'
+      error: `No changes found between current branch and ${context.defaultBranch}. Nothing to analyze.`
     };
   }
 

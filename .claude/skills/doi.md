@@ -14,8 +14,8 @@ When invoked, this skill will:
 
 1. **Detect Git Context**
    - Identify the current branch name
-   - Compare against the main integration branch (default: `main`)
-   - Compute the git diff between main and current branch
+   - Detect the default branch from remote (e.g., `main`, `master`, `develop`)
+   - Compute the git diff between default branch and current branch
 
 2. **Analyze the Diff**
    - Summarize changes at a high level:
@@ -54,11 +54,18 @@ Use the Bash tool to run these git commands and capture the output:
 # Get current branch name
 git rev-parse --abbrev-ref HEAD
 
-# Get the main branch name (check if 'main' or 'master' exists)
-git show-ref --verify --quiet refs/heads/main && echo "main" || (git show-ref --verify --quiet refs/heads/master && echo "master" || echo "main")
+# Get the base branch (the branch the current branch was built on top of)
+# Priority: 1) Remote's default branch, 2) Upstream tracking branch, 3) Closest ancestor branch
+CURRENT=$(git rev-parse --abbrev-ref HEAD)
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || \
+git config --get branch.$CURRENT.merge 2>/dev/null | sed 's@^refs/heads/@@' || \
+(for b in $(git branch -r | grep -v HEAD | grep -v "origin/$CURRENT" | sed 's/^ *//'); do \
+  git merge-base HEAD "$b" >/dev/null 2>&1 && \
+  echo "$(git rev-list --count $(git merge-base HEAD "$b")..HEAD) ${b#origin/}"; \
+done | sort -n | head -1 | awk '{print $2}')
 
 # Get the merge base (common ancestor)
-git merge-base <main-branch> HEAD
+git merge-base <default-branch> HEAD
 
 # Get the full diff with context
 git diff <merge-base>..HEAD
@@ -192,7 +199,7 @@ Provide encouragement based on score:
 ## Configuration
 
 The skill respects these environment variables or config:
-- `DOI_MAIN_BRANCH`: Override the main branch name (default: auto-detect main/master)
+- `DOI_DEFAULT_BRANCH`: Override the default branch name (default: auto-detect from `origin/HEAD`, falls back to `main` or `master`)
 - `DOI_MIN_QUESTIONS`: Minimum questions to generate (default: 2)
 - `DOI_MAX_QUESTIONS`: Maximum questions to generate (default: 10)
 
